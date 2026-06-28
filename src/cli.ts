@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { spawn } from 'child_process';
 import * as path from 'path';
+import * as readline from 'readline';
 import { ChangelogAutomation, reserveId, insertWorkflow, updateWorkflow, getWorkflow, listWorkflows } from './automations/changelog';
 
 function resolveId(input: string): string {
@@ -53,34 +54,142 @@ changelog
   .description('Generate a changelog entry for a commit range')
   .requiredOption('--from <ref>', 'start point for comparison (tag, commit hash, etc.)')
   .option('--to <ref>', 'end point for comparison (defaults to HEAD)')
-  .action(async (opts: { from: string; to?: string }) => {
+  .option('-i, --interactive', 'run in interactive mode with inline prompt')
+  .action(async (opts: { from: string; to?: string; interactive?: boolean }) => {
     const projectName = getProjectName();
     const workflowId = await reserveId(projectName);
     const to = opts.to || 'HEAD';
 
-    await insertWorkflow(workflowId, 'working', { step: 'spawned' });
+    if (!opts.interactive) {
+      await insertWorkflow(workflowId, 'working', { step: 'spawned' });
 
-    const workerEnv = {
-      ...process.env,
-      WORKER_ID: workflowId,
-      WORKER_FROM: opts.from,
-      WORKER_TO: to,
-      WORKER_CWD: process.env.OPEN_AUTOMATE_CWD || process.cwd(),
+      const workerEnv = {
+        ...process.env,
+        WORKER_ID: workflowId,
+        WORKER_FROM: opts.from,
+        WORKER_TO: to,
+        WORKER_CWD: process.env.OPEN_AUTOMATE_CWD || process.cwd(),
+      };
+
+      const worker = spawn(
+        process.argv[0],
+        ['node_modules/.bin/tsx', 'src/automations/changelog/worker.ts'],
+        { stdio: 'ignore', detached: true, env: workerEnv },
+      );
+      worker.unref();
+
+      console.log(`${workflowId} spawned.`);
+      console.log(`Run \`open-automate changelog status ${workflowId}\` to check progress.`);
+      return;
+    }
+
+    // Interactive mode
+    await insertWorkflow(workflowId, 'working', { step: 'spawned' });
+    console.log(`${workflowId} running...\n`);
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: '> ',
+    });
+
+    let currentEntry: string | null = null;
+    let currentAnchor: string | null = null;
+    let currentTarget: string | null = null;
+    let generating = false;
+    let pendingLine: string | null = null;
+
+    const sigintHandler = () => {
+      console.log('\nExiting. Use `open-automate changelog status ' + workflowId + '` to resume later.');
+      rl.close();
+      process.exit(0);
     };
 
-    const worker = spawn(
-      process.argv[0],
-      ['node_modules/.bin/tsx', 'src/automations/changelog/worker.ts'],
-      {
-        stdio: 'ignore',
-        detached: true,
-        env: workerEnv,
-      },
-    );
-    worker.unref();
+    process.on('SIGINT', sigintHandler);
 
-    console.log(`${workflowId} spawned.`);
-    console.log(`Run \`open-automate changelog status ${workflowId}\` to check progress.`);
+    rl.on('line', async (line) => {
+      if (generating) {
+        pendingLine = line;
+        return;
+      }
+      await handleLine(line);
+    });
+
+    async function handleLine(line: string) {
+      const trimmed = line.trim();
+
+      if (trimmed === '/accept') {
+        if (!currentEntry || !currentTarget) {
+          console.log('No entry to accept yet.');
+          rl.prompt();
+          return;
+        }
+        ChangelogAutomation.applyEntry(currentTarget, currentEntry, currentAnchor || '');
+        await updateWorkflow(workflowId, { status: 'accepted' });
+        console.log(`Changelog entry applied to ${currentTarget}`);
+        process.removeListener('SIGINT', sigintHandler);
+        rl.close();
+        process.exit(0);
+        return;
+      }
+
+      const rejectMatch = trimmed.match(/^\/reject\s+(.+)$/s);
+      if (rejectMatch) {
+        await generateOrRevise(rejectMatch[1]);
+        return;
+      }
+
+      if (trimmed === '/reject') {
+        console.log('Use /reject <feedback> to provide revision feedback, or use the async CLI commands to reject without feedback.');
+        rl.prompt();
+        return;
+      }
+
+      console.log('Commands: /accept, /reject <feedback>, Ctrl+C to exit');
+      rl.prompt();
+    }
+
+    async function generateOrRevise(feedback?: string) {
+      generating = true;
+      console.log('Generating entry...');
+      try {
+        const analysis = await ChangelogAutomation.runInteractive(
+          workflowId, opts.from, to,
+          feedback && currentEntry ? { previousEntry: currentEntry, feedback } : undefined,
+        );
+        currentEntry = analysis.entry;
+        currentAnchor = analysis.insertBeforeAnchor;
+        currentTarget = analysis.targetPath;
+
+        console.log('\n--- Proposed Entry ---\n');
+        console.log(analysis.entry.trim());
+        if (analysis.placementDescription) {
+          console.log(`\nPlacement: ${analysis.placementDescription}`);
+        }
+        console.log('');
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
+        process.exit(1);
+      }
+      generating = false;
+
+      const next = pendingLine;
+      pendingLine = null;
+      if (next) {
+        await handleLine(next);
+        return;
+      }
+
+      try { rl.prompt(); } catch { rl.close(); }
+    }
+
+    await generateOrRevise();
+
+    // If stdin is piped and closed, exit cleanly
+    if (!process.stdin.isTTY) {
+      rl.close();
+      process.exit(0);
+    }
   });
 
 changelog

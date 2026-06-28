@@ -1,5 +1,16 @@
 # Changelog
 
+
+## [dc03c15] - 2026-06-28
+
+### Added
+
+- Fetch real repository tags to prevent hallucinated version numbers
+- Initialize changelog with commit hash references
+- Support revision feedback for rejected changelog entries
+
+[dc03c15]: https://github.com/dsillman2000/open-automations/commit/dc03c150ffb92ec7b3c10471597af468e1be80e2
+
 ## [Unreleased]
 
 

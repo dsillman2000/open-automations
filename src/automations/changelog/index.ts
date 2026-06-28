@@ -204,6 +204,45 @@ export class ChangelogAutomation {
     return fs.readFileSync(filePath, 'utf8');
   }
 
+  static async runInteractive(
+    workflowId: string,
+    from: string,
+    to: string,
+    opts?: { previousEntry?: string; feedback?: string },
+  ): Promise<z.infer<typeof ChangelogEntrySchema> & { targetPath: string }> {
+    const userCwd = process.env.OPEN_AUTOMATE_CWD || process.cwd();
+    const targetPath = path.join(userCwd, 'CHANGELOG.md');
+    const stepInfo: Record<string, unknown> = { step: 'generating', ...(opts?.feedback ? { feedback: opts.feedback } : {}) };
+    await updateWorkflow(workflowId, { status: 'working', step_info: stepInfo });
+
+    const existingContent = ChangelogAutomation.readExistingChangelog(targetPath);
+    const rawCommits = ChangelogAutomation.getGitCommits(from, to);
+    if (!rawCommits.trim()) {
+      await updateWorkflow(workflowId, { status: 'error', step_info: { step: 'done', error: 'No commits found.' } });
+      throw new Error('No commits found in range.');
+    }
+
+    const tags = ChangelogAutomation.getTags();
+    const analysis = await ChangelogAutomation.generateChangelogEntry(rawCommits, existingContent, from, to, tags, opts);
+
+    if (!analysis.hasChanges && !opts?.feedback) {
+      await updateWorkflow(workflowId, { status: 'error', step_info: { step: 'done', error: 'No new changes to add.' } });
+      throw new Error('No new changes to add to changelog.');
+    }
+
+    await updateWorkflow(workflowId, {
+      status: 'pending',
+      entry: analysis.entry,
+      insert_before_anchor: analysis.insertBeforeAnchor,
+      target_path: targetPath,
+      placement_description: analysis.placementDescription,
+      args: { from, to },
+      step_info: { step: 'done' },
+    });
+
+    return { ...analysis, targetPath };
+  }
+
   static async generateChangelogEntry(
     commits: string,
     currentChangelog: string,
