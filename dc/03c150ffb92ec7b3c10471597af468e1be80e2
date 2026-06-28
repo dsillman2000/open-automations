@@ -1,0 +1,26 @@
+src/automations/changelog/KEEP_A_CHANGELOG.md
+  s_54fff081fef21d::t_1ba58ec0bda68c 43-44,52
+src/automations/changelog/worker.ts
+  s_54fff081fef21d::t_5ea309568a2a84 47,49
+src/automations/changelog/index.ts
+  s_54fff081fef21d::t_3451f54a9e6834 254
+  s_54fff081fef21d::t_ee8b115579c642 243-245
+  s_54fff081fef21d::t_45e3eeb283dca7 180-190
+  s_54fff081fef21d::t_a0b461432dfd08 212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "dc03c150ffb92ec7b3c10471597af468e1be80e2",
+  "prompts": {},
+  "sessions": {
+    "s_54fff081fef21d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0f1e29f48ffeW63vVyzpCeP5sp",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  }
+}
