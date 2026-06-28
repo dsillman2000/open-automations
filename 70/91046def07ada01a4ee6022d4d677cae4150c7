@@ -1,0 +1,20 @@
+CHANGELOG.md
+  s_54fff081fef21d::t_54e03e9f63ae1e 6,20
+  s_54fff081fef21d::t_a9e6ef4ab6d616 1-5,7-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "7091046def07ada01a4ee6022d4d677cae4150c7",
+  "prompts": {},
+  "sessions": {
+    "s_54fff081fef21d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0f1e29f48ffeW63vVyzpCeP5sp",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  }
+}
