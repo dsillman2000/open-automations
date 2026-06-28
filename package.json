@@ -1,0 +1,43 @@
+{
+  "name": "open-automations",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "bin": {
+    "open-automate": "./bin/open-automate"
+  },
+  "scripts": {
+    "build": "tsc && cp src/automations/changelog/KEEP_A_CHANGELOG.md dist/automations/changelog/",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dsillman2000/open-automations.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/dsillman2000/open-automations/issues"
+  },
+  "homepage": "https://github.com/dsillman2000/open-automations#readme",
+  "dependencies": {
+    "@dbos-inc/dbos-sdk": "^4.22.6",
+    "ai": "^7.0.4",
+    "ai-sdk-provider-opencode-sdk": "^3.0.6",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.16.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/pg": "^8.20.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.22.4",
+    "typescript": "~5.8.3"
+  }
+}
