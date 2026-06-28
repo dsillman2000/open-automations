@@ -177,6 +177,17 @@ function readSpec(): string {
 
 export class ChangelogAutomation {
 
+  static getTags(): string[] {
+    try {
+      const cwd = process.env.OPEN_AUTOMATE_CWD || process.cwd();
+      execSync('git fetch --tags --force 2>/dev/null', { encoding: 'utf8', cwd });
+      const output = execSync('git tag --sort=-creatordate', { encoding: 'utf8', cwd });
+      return output.trim().split('\n').filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
   static getGitCommits(from: string, to: string): string {
     try {
       const range = `${from}..${to}`;
@@ -198,6 +209,7 @@ export class ChangelogAutomation {
     currentChangelog: string,
     from: string,
     to: string,
+    tags: string[],
     opts?: { previousEntry?: string; feedback?: string },
   ): Promise<z.infer<typeof ChangelogEntrySchema>> {
     const revisionBlock = opts?.previousEntry && opts?.feedback
@@ -228,6 +240,9 @@ export class ChangelogAutomation {
         ${currentChangelog || '(file does not exist yet)'}
         """
         ${revisionBlock}
+        Repository tags (may be empty):
+        ${tags.length > 0 ? tags.join(', ') : '(no tags exist)'}
+
         TASK:
         1. Analyze the commits and categorize them using the six change types (Added, Changed, Deprecated, Removed, Fixed, Security).
         2. Generate a single markdown changelog entry for this release conforming exactly to the spec.
@@ -236,6 +251,7 @@ export class ChangelogAutomation {
            - Otherwise, insert before the first existing release header (e.g., '## [1.0.0]').
            - If no file exists or the entry should go at the end, return an empty string for insertBeforeAnchor.
         4. Set hasChanges to false only if all commits are already fully represented in the existing changelog.
+        5. NEVER hallucinate version numbers or tag names. Use only the tags listed above. If the list is empty, use the commit hash (full SHA) as the reference identifier. Format links as: [<hash>]: https://github.com/<owner>/<repo>/commit/<hash>. Do NOT generate compare URLs or tag-based links — only direct commit links.
 
         Below is the "Keep a Changelog" specification that your output must conform to:
         ${readSpec()}

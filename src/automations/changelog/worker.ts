@@ -44,8 +44,9 @@ async function main() {
     return;
   }
 
+  const tags = ChangelogAutomation.getTags();
   const analysis = await ChangelogAutomation.generateChangelogEntry(
-    rawCommits, existingContent, from, to,
+    rawCommits, existingContent, from, to, tags,
     feedback && row.entry ? { previousEntry: row.entry, feedback } : undefined,
   );
 
