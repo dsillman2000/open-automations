@@ -1,0 +1,14 @@
+src/automations/changelog/index.ts
+  h_4cc74772b10fd4 267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "a8811c122a829b78b1c70f66c600e76d146c6c75",
+  "prompts": {},
+  "humans": {
+    "h_4cc74772b10fd4": {
+      "author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  }
+}
