@@ -1,4 +1,3 @@
-import { DBOS } from '@dbos-inc/dbos-sdk';
 import { generateText } from 'ai';
 import { createOpencode } from 'ai-sdk-provider-opencode-sdk';
 import { z } from 'zod';
@@ -10,7 +9,154 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DRAFT_TABLE = 'changelog_draft';
+let _opencode: ReturnType<typeof createOpencode>;
+
+function getOpencode() {
+  if (!_opencode) {
+    const password = process.env.OPENCODE_SERVER_PASSWORD;
+    const auth = password
+      ? { Authorization: 'Basic ' + Buffer.from('opencode:' + password).toString('base64') }
+      : undefined;
+    _opencode = createOpencode({
+      autoStartServer: false,
+      clientOptions: auth ? { headers: auth } : undefined,
+    });
+  }
+  return _opencode;
+}
+
+export interface ChangelogArgs {
+  from: string;
+  to?: string;
+  changelogPath?: string;
+}
+
+export interface WorkflowRow {
+  workflow_id: string;
+  status: string;
+  entry: string | null;
+  insert_before_anchor: string | null;
+  target_path: string | null;
+  placement_description: string | null;
+  step_info: Record<string, unknown> | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+const ChangelogEntrySchema = z.object({
+  hasChanges: z.boolean(),
+  entry: z.string(),
+  insertBeforeAnchor: z.string(),
+  placementDescription: z.string(),
+});
+
+async function withPg<T>(fn: (pool: import('pg').Pool) => Promise<T>): Promise<T> {
+  const { default: pg } = await import('pg');
+  const pool = new pg.Pool({
+    user: 'open',
+    password: 'automations',
+    host: 'localhost',
+    port: 5432,
+    database: 'open_automations_dbos_sys',
+  });
+  try {
+    await pool.query(`CREATE SCHEMA IF NOT EXISTS dbos`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dbos.automation_sequences (
+        project_name TEXT PRIMARY KEY,
+        last_sequence INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dbos.automation_workflows (
+        workflow_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        entry TEXT,
+        insert_before_anchor TEXT,
+        target_path TEXT,
+        placement_description TEXT,
+        step_info JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    return await fn(pool);
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function reserveId(projectName: string): Promise<string> {
+  return withPg(async (pool) => {
+    const r = await pool.query(
+      `INSERT INTO dbos.automation_sequences (project_name, last_sequence)
+       VALUES ($1, 1)
+       ON CONFLICT (project_name) DO UPDATE SET last_sequence = automation_sequences.last_sequence + 1
+       RETURNING last_sequence`,
+      [projectName],
+    );
+    const seq: number = r.rows[0].last_sequence;
+    return `changelog/${projectName}/${seq}`;
+  });
+}
+
+export async function insertWorkflow(
+  workflowId: string,
+  status: string,
+  stepInfo: Record<string, unknown>,
+) {
+  return withPg(async (pool) => {
+    await pool.query(
+      `INSERT INTO dbos.automation_workflows (workflow_id, status, step_info)
+       VALUES ($1, $2, $3)`,
+      [workflowId, status, JSON.stringify(stepInfo)],
+    );
+  });
+}
+
+export async function updateWorkflow(
+  workflowId: string,
+  fields: Partial<Pick<WorkflowRow, 'status' | 'entry' | 'insert_before_anchor' | 'target_path' | 'placement_description' | 'step_info'>>,
+) {
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      setClauses.push(`${key} = $${idx++}`);
+      params.push(key === 'step_info' ? JSON.stringify(value) : value);
+    }
+  }
+  if (setClauses.length === 0) return;
+  setClauses.push(`updated_at = NOW()`);
+  params.push(workflowId);
+  return withPg(async (pool) => {
+    await pool.query(
+      `UPDATE dbos.automation_workflows SET ${setClauses.join(', ')} WHERE workflow_id = $${idx}`,
+      params,
+    );
+  });
+}
+
+export async function getWorkflow(workflowId: string): Promise<WorkflowRow | null> {
+  return withPg(async (pool) => {
+    const r = await pool.query(
+      `SELECT * FROM dbos.automation_workflows WHERE workflow_id = $1`,
+      [workflowId],
+    );
+    return r.rows.length > 0 ? r.rows[0] as WorkflowRow : null;
+  });
+}
+
+export async function listWorkflows(limit: number): Promise<WorkflowRow[]> {
+  return withPg(async (pool) => {
+    const r = await pool.query(
+      `SELECT * FROM dbos.automation_workflows ORDER BY created_at DESC LIMIT $1`,
+      [limit],
+    );
+    return r.rows as WorkflowRow[];
+  });
+}
 
 function readSpec(): string {
   const candidates = [
@@ -25,72 +171,9 @@ function readSpec(): string {
   return '(spec not found)';
 }
 
-let _opencode: ReturnType<typeof createOpencode>;
-
-function getOpencode() {
-  if (!_opencode) {
-    const password = process.env.OPENCODE_SERVER_PASSWORD;
-    const auth = password
-      ? { Authorization: 'Basic ' + Buffer.from('opencode:' + password).toString('base64') }
-      : undefined;
-    _opencode = createOpencode({
-      autoStartServer: true,
-      serverTimeout: 30000,
-      clientOptions: auth ? { headers: auth } : undefined,
-    });
-  }
-  return _opencode;
-}
-
-export interface ChangelogArgs {
-  from: string;
-  to?: string;
-  changelogPath?: string;
-}
-
-export interface DraftData {
-  entry: string;
-  insertBeforeAnchor: string;
-  targetPath: string;
-}
-
-const ChangelogEntrySchema = z.object({
-  hasChanges: z.boolean(),
-  entry: z.string(),
-  insertBeforeAnchor: z.string(),
-  placementDescription: z.string(),
-});
-
-async function queryDB(sql: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
-  const { default: pg } = await import('pg');
-  const pool = new pg.Pool({
-    user: 'open',
-    password: 'automations',
-    host: 'localhost',
-    port: 5432,
-    database: 'open_automations_dbos_sys',
-  });
-  try {
-    await pool.query(`CREATE SCHEMA IF NOT EXISTS dbos`);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS dbos.${DRAFT_TABLE} (
-        id INT PRIMARY KEY DEFAULT 1,
-        data JSONB NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        CONSTRAINT single_row CHECK (id = 1)
-      )
-    `);
-    const result = await pool.query(sql, params);
-    return result.rows;
-  } finally {
-    await pool.end();
-  }
-}
-
 export class ChangelogAutomation {
 
-  @DBOS.step()
-  static async getGitCommits(from: string, to: string): Promise<string> {
+  static getGitCommits(from: string, to: string): string {
     try {
       const range = `${from}..${to}`;
       const command = `git log ${range} --oneline --pretty=format:"%h - %an: %s"`;
@@ -101,13 +184,11 @@ export class ChangelogAutomation {
     }
   }
 
-  @DBOS.step()
-  static async readExistingChangelog(filePath: string): Promise<string> {
+  static readExistingChangelog(filePath: string): string {
     if (!fs.existsSync(filePath)) return '';
     return fs.readFileSync(filePath, 'utf8');
   }
 
-  @DBOS.step()
   static async generateChangelogEntry(
     commits: string,
     currentChangelog: string,
@@ -155,44 +236,7 @@ export class ChangelogAutomation {
     return JSON.parse(text);
   }
 
-  @DBOS.workflow()
-  static async runWorkflow(args: ChangelogArgs) {
-    const userCwd = process.env.OPEN_AUTOMATE_CWD || process.cwd();
-    const targetPath = args.changelogPath
-      ? path.resolve(args.changelogPath)
-      : path.join(userCwd, 'CHANGELOG.md');
-    const to = args.to || 'HEAD';
-
-    console.log(`Generating changelog entry from ${args.from}..${to} ...`);
-    const rawCommits = await ChangelogAutomation.getGitCommits(args.from, to);
-    const existingContent = await ChangelogAutomation.readExistingChangelog(targetPath);
-
-    if (!rawCommits.trim()) {
-      console.log('No commits found in range.');
-      return;
-    }
-
-    const analysis = await ChangelogAutomation.generateChangelogEntry(rawCommits, existingContent, args.from, to);
-
-    if (!analysis.hasChanges) {
-      console.log('No new changes to add to changelog.');
-      return;
-    }
-
-    console.log('\n--- Proposed Changelog Entry ---\n');
-    console.log(analysis.entry.trim());
-    console.log('\n--- Placement ---');
-    console.log(analysis.placementDescription);
-    console.log('\n---');
-    console.log('Run with --approve to apply or --reject to discard.\n');
-
-    await queryDB(
-      `INSERT INTO dbos.${DRAFT_TABLE} (id, data) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET data = $1, created_at = NOW()`,
-      [JSON.stringify({ entry: analysis.entry, insertBeforeAnchor: analysis.insertBeforeAnchor, targetPath } satisfies DraftData)],
-    );
-  }
-
-  static async applyEntry(targetPath: string, entry: string, insertBeforeAnchor: string) {
+  static applyEntry(targetPath: string, entry: string, insertBeforeAnchor: string) {
     const formatted = '\n' + entry.trim() + '\n\n';
     let existing = '';
     if (fs.existsSync(targetPath)) {
@@ -213,14 +257,5 @@ export class ChangelogAutomation {
     } else {
       fs.writeFileSync(targetPath, existing.trimEnd() + '\n\n' + entry.trimStart() + '\n', 'utf8');
     }
-  }
-
-  static async getDraft(): Promise<DraftData | null> {
-    const rows = await queryDB(`SELECT data FROM dbos.${DRAFT_TABLE} WHERE id = 1`);
-    return rows.length > 0 ? (rows[0].data as DraftData) : null;
-  }
-
-  static async clearDraft() {
-    await queryDB(`DELETE FROM dbos.${DRAFT_TABLE} WHERE id = 1`);
   }
 }
