@@ -1,0 +1,49 @@
+tsconfig.json
+  h_4cc74772b10fd4 1-17
+package-lock.json
+  s_54fff081fef21d::t_2ce916280fb27d 1-1311
+.gitignore
+  h_4cc74772b10fd4 1-4
+package.json
+  s_54fff081fef21d::t_9ce6b0f820e370 38
+  s_54fff081fef21d::t_f48ea192ac9bae 31-32
+  s_54fff081fef21d::t_b0d64bf64ba271 5,11-12
+  s_54fff081fef21d::t_1bf0403f4a2365 28,33
+  s_54fff081fef21d::t_24fc4e89c12484 36-37
+  s_54fff081fef21d::t_478fc0a0f999be 34
+  s_54fff081fef21d::t_abfa73d483caa8 41
+  h_4cc74772b10fd4 22
+  s_54fff081fef21d::t_b97f0a0257e20d 15-17
+  s_54fff081fef21d::t_2f54946d0525e8 42-43
+  s_54fff081fef21d::t_7b2779901b26f6 9
+  s_54fff081fef21d::t_93d2d6822b8f02 26-27
+  s_54fff081fef21d::t_ce6fe5ba34f381 39-40
+  s_54fff081fef21d::t_5fe6bed90d39f7 6-8,14,18,25,35
+  s_54fff081fef21d::t_3f625df83a3403 29
+  s_54fff081fef21d::t_88ed59f1b65edc 10
+  s_54fff081fef21d::t_9de443d76a8d9d 2-4
+  s_54fff081fef21d::t_91e2b462746e3e 13
+  s_54fff081fef21d::t_22b3e0b76f7661 30
+  s_54fff081fef21d::t_75fd5ea37d0958 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0f9f5f8b6961b1c0e93d87e62c019a140e507a6e",
+  "prompts": {},
+  "humans": {
+    "h_4cc74772b10fd4": {
+      "author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  },
+  "sessions": {
+    "s_54fff081fef21d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0f1e29f48ffeW63vVyzpCeP5sp",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  }
+}
