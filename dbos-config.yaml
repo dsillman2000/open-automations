@@ -1,0 +1,12 @@
+name: open-automations
+language: node
+system_database_url: postgresql://open:automations@localhost:5432/open_automations_dbos_sys
+runtimeConfig:
+  start:
+    - node dist/index.js
+database:
+  hostname: localhost
+  port: 5432
+  username: open
+  password: automations
+  app_db_name: open_automations
