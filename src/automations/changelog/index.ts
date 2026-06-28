@@ -264,7 +264,7 @@ export class ChangelogAutomation {
       : '';
 
     const result = await generateText({
-      model: getOpencode()('opencode/big-pickle'),
+      model: getOpencode()('opencode/gpt-5-nano'),
       prompt: `
         You are an expert release engineer generating a single changelog entry.
         Respond with a JSON object only, no markdown or other text.
