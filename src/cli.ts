@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { spawn } from 'child_process';
 import * as path from 'path';
-import * as fs from 'fs';
 import { ChangelogAutomation, reserveId, insertWorkflow, updateWorkflow, getWorkflow, listWorkflows } from './automations/changelog';
 
 function resolveId(input: string): string {
@@ -135,9 +134,9 @@ changelog
   });
 
 changelog
-  .command('reject <id>')
-  .description('Reject and discard a pending changelog entry')
-  .action(async (inputId: string) => {
+  .command('reject <id> [feedback...]')
+  .description('Reject a pending entry, or provide feedback to revise it')
+  .action(async (inputId: string, feedback: string[] | undefined) => {
     const workflowId = resolveId(inputId);
     const wf = await getWorkflow(workflowId);
     if (!wf) {
@@ -148,8 +147,34 @@ changelog
       console.error(`Workflow '${workflowId}' is not pending.`);
       process.exit(1);
     }
-    await updateWorkflow(workflowId, { status: 'rejected' });
-    console.log(`Changelog entry rejected.`);
+
+    if (!feedback || feedback.length === 0) {
+      await updateWorkflow(workflowId, { status: 'rejected' });
+      console.log(`Changelog entry rejected.`);
+      return;
+    }
+
+    const feedbackText = feedback.join(' ');
+
+    await updateWorkflow(workflowId, {
+      status: 'working',
+      step_info: { step: 'generating', feedback: feedbackText },
+    });
+
+    const workerEnv = {
+      ...process.env,
+      WORKER_ID: workflowId,
+      WORKER_CWD: process.env.OPEN_AUTOMATE_CWD || process.cwd(),
+    };
+
+    const worker = spawn(
+      process.argv[0],
+      ['node_modules/.bin/tsx', 'src/automations/changelog/worker.ts'],
+      { stdio: 'ignore', detached: true, env: workerEnv },
+    );
+    worker.unref();
+
+    console.log(`${workflowId} revised with feedback and re-spawned.`);
   });
 
 const workflows = program

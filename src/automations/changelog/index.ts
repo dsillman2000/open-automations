@@ -38,6 +38,7 @@ export interface WorkflowRow {
   insert_before_anchor: string | null;
   target_path: string | null;
   placement_description: string | null;
+  args: Record<string, unknown> | null;
   step_info: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;
@@ -80,6 +81,9 @@ async function withPg<T>(fn: (pool: import('pg').Pool) => Promise<T>): Promise<T
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await pool.query(`
+      ALTER TABLE dbos.automation_workflows ADD COLUMN IF NOT EXISTS args JSONB
+    `);
     return await fn(pool);
   } finally {
     await pool.end();
@@ -116,7 +120,7 @@ export async function insertWorkflow(
 
 export async function updateWorkflow(
   workflowId: string,
-  fields: Partial<Pick<WorkflowRow, 'status' | 'entry' | 'insert_before_anchor' | 'target_path' | 'placement_description' | 'step_info'>>,
+  fields: Partial<Pick<WorkflowRow, 'status' | 'entry' | 'insert_before_anchor' | 'target_path' | 'placement_description' | 'args' | 'step_info'>>,
 ) {
   const setClauses: string[] = [];
   const params: unknown[] = [];
@@ -194,7 +198,20 @@ export class ChangelogAutomation {
     currentChangelog: string,
     from: string,
     to: string,
+    opts?: { previousEntry?: string; feedback?: string },
   ): Promise<z.infer<typeof ChangelogEntrySchema>> {
+    const revisionBlock = opts?.previousEntry && opts?.feedback
+      ? `
+        You previously generated this entry for this range:
+        """${opts.previousEntry}"""
+
+        The user reviewed it and provided this feedback:
+        """${opts.feedback}"""
+
+        Revise the entry to address the feedback. Keep the same commit range.
+      `
+      : '';
+
     const result = await generateText({
       model: getOpencode()('opencode/big-pickle'),
       prompt: `
@@ -210,7 +227,7 @@ export class ChangelogAutomation {
         """
         ${currentChangelog || '(file does not exist yet)'}
         """
-
+        ${revisionBlock}
         TASK:
         1. Analyze the commits and categorize them using the six change types (Added, Changed, Deprecated, Removed, Fixed, Security).
         2. Generate a single markdown changelog entry for this release conforming exactly to the spec.
