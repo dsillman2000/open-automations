@@ -1,0 +1,14 @@
+CHANGELOG.md
+  h_4cc74772b10fd4 14-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2c7a5882b777946567c4de3cf45b8a94eee76120",
+  "prompts": {},
+  "humans": {
+    "h_4cc74772b10fd4": {
+      "author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  }
+}
