@@ -1,0 +1,28 @@
+src/automations/changelog/worker.ts
+  s_54fff081fef21d::t_dc99c37e4f077a 5-6
+  s_54fff081fef21d::t_6503bda5bf2fba 1-4,7-15,17,33,36,38,48-59
+  s_54fff081fef21d::t_c21bc74fa6c49c 16,18-32,34-35,37,39-47
+src/cli.ts
+  s_54fff081fef21d::t_b5da19f11e8044 53
+  s_54fff081fef21d::t_0852f29ddc92b1 2-11,13-20,33,58-59,61-84,88-93,96-115,119-125,128-134,138-149,151-152,157,161,164-176,181-206
+  s_54fff081fef21d::t_b67314c4982477 135-137,150,153-156,158-160,162-163,177-180
+src/automations/changelog/index.ts
+  s_54fff081fef21d::t_6743c12a2c2047 34-43,53,65-78,80,83,89-173,176,187,239
+  s_54fff081fef21d::t_18ac45010da654 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "1a7fc3b613afa177d303a8c7b8ad1f3126d0c838",
+  "prompts": {},
+  "sessions": {
+    "s_54fff081fef21d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0f1e29f48ffeW63vVyzpCeP5sp",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "dsillman2000 <dsillman2000@yahoo.com>"
+    }
+  }
+}
